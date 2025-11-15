@@ -1,20 +1,20 @@
-# 💌 ZeroBounce + Supabase Auth Integration (Lovable Cloud Guide)
-This repository is part of the **ZeroBounce Blog Post + Video Tutorial**, showing how to add **real-time email validation** to your **Lovable app** using **ZeroBounce** and **Supabase Auth**.
+# 💌 ZeroBounce + Supabase Auth Integration (Bolt.new Guide)
+This repository is part of the **ZeroBounce Blog Post + Video Tutorial**, showing how to add **real-time email validation** to your **Bolt.new app** using **ZeroBounce** and **Supabase Auth**.
 
 You’ll learn how to build a **production-ready signup flow** that catches typos, blocks disposable emails, and gives helpful “Did you mean…” suggestions — all powered by the ZeroBounce API.
 
-Remix with <a href="https://lovable.dev/projects/53eeac2c-f1a9-4a55-a2b5-b1046abaf21e?magic_link=mc_3adc5f4c-95e3-425c-8fcf-1229d21044a2"><img src="https://lovable.dev/img/logo/lovable-logo-icon.svg" width="10" alt="View in Lovable" /> Lovable</a>
+Import our demo into your bolt.new account by clicking  <a href="https://bolt.new/~/sb1-9pfj4hp7"><img src="https://pbs.twimg.com/profile_images/1985788830180655104/wpxEZ8Rp_400x400.jpg" width="10" alt="View in Bolt.new" /> here</a>
 
 ---
 
-## 🚀 Getting Started in Lovable
+## 🚀 Getting Started in Bolt.new
 
 ### 1. Upload the Two Files
 
 Add this 2 files to the chat:
 
-- [zb_migration.sql](https://github.com/zerobounce/lovable-supabase-auth-zerobounce-demo/blob/main/zb_migration.sql)
-- [example_auth_form.tsx](https://github.com/zerobounce/lovable-supabase-auth-zerobounce-demo/blob/main/example_auth_form.tsx)
+- [zb_migration.sql](https://github.com/zerobounce/bolt.new-supabase-auth-zerobounce-demo/blob/main/zb_migration.sql)
+- [example_auth_form.tsx](https://github.com/zerobounce/bolt.new-supabase-auth-zerobounce-demo/blob/main/example_auth_form.tsx)
 
 
 Use this setup prompt after files where uploaded:
@@ -33,24 +33,24 @@ This will apply the database migration and wire up the frontend automatically.
 
 ---
 
-### 2. Add Your ZeroBounce API Key (in Lovable Cloud)
+### 2. Add Your ZeroBounce API Key (in Bolt.new)
 
 This integration uses your **Supabase database** under the hood — so make sure **Cloud Mode is enabled** in Lovable.
 
 Then:
 
-1. Go to **Cloud → Tables → app_secrets**
-2. Click **Insert Row**
+1. Go to **Database → Tables → app_secrets**
+2. Click **Add Row**
 3. Add your API key like this:
 
-| name | value |
-|------|--------|
-| ZEROBOUNCE_API_KEY | your_api_key_from_zerobounce.net |
+| name | value | updated_at |
+|------|--------|--------|
+| ZEROBOUNCE_API_KEY | your_api_key_from_zerobounce.net | 2025-11-14 13:46:58+00
 
 You can find your key at:  
 👉 [https://www.zerobounce.net/members/API](https://www.zerobounce.net/members/API)
 
-That’s it — your Cloud environment now knows how to talk to ZeroBounce!
+That’s it — your environment now knows how to talk to ZeroBounce!
 
 ---
 
@@ -58,7 +58,7 @@ That’s it — your Cloud environment now knows how to talk to ZeroBounce!
 
 Once the migration runs and your API key is set:
 
-1. Go to your Lovable app preview.
+1. Go to "Preview" tab.
 2. Try signing up with an email — for example, a typo like `jane@gmial.com`.
 3. You’ll see a **“Did you mean…”** prompt appear in the UI.
 4. Invalid or disposable emails will be rejected gracefully.
@@ -77,7 +77,7 @@ The magic happens automatically through Supabase triggers and functions set up b
 
 ---
 
-## 💻 File Overview
+## 💻 Code Overview
 
 ### 🗂️ `zb_migration.sql`
 Sets up the Supabase backend:
@@ -87,32 +87,17 @@ Sets up the Supabase backend:
 - Functions for parsing, validating, and logging results.
 - A trigger on `auth.users` that automatically validates every signup.
 
-This migration is idempotent — you can run it safely multiple times in Cloud.
-
 ---
 
 ### 💫 `example_auth_form.tsx`
-A complete, ready-to-use React component for user signup and login.
-
-- Integrates Supabase Auth.
-- Displays “Did you mean…” suggestions inline.
-- Styled with [shadcn/ui](https://ui.shadcn.com) for production-ready polish.
-- Automatically shows ZeroBounce validation feedback through toasts.
+A production-ready signup form component built with:
+- React + TypeScript
+- Supabase Auth
+- shadcn/ui for a clean, modern style
 
 ---
 
 ## 📺 Watch the Video
 
-🎥 See the full tutorial on how to integrate this in **Lovable Cloud** step by step:
+🎥 See the full tutorial on how to integrate this in **Bolt.new** step by step:
 > *(link video coming soon)*
-
----
-
-## 🧩 Tech Stack
-
-- **Lovable Cloud** (Supabase backend)
-- **ZeroBounce API**
-- **React / TypeScript**
-- **shadcn/ui**
-
----
