@@ -8,12 +8,14 @@ CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA extensions;
 -- TABLES
 -- =====================================================
 
+-- Store secrets via Supabase Vault in production; this table is a demo fallback only.
 CREATE TABLE IF NOT EXISTS public.app_secrets (
   name TEXT PRIMARY KEY,
   value TEXT NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
+-- Validation log may contain PII; set a retention job in production (e.g. delete rows older than 90 days).
 CREATE TABLE public.zb_email_validation (
   id UUID NOT NULL DEFAULT uuid_generate_v4(),
   email TEXT NOT NULL,
@@ -167,7 +169,7 @@ BEGIN
   INTO http_status, http_body
   FROM extensions.http_post(
     'https://api.zerobounce.net/v2/validate',
-    'api_key=' || api_key || '&email=' || normalized_email,
+    'api_key=' || extensions.urlencode(api_key) || '&email=' || extensions.urlencode(normalized_email),
     'application/x-www-form-urlencoded'
   ) AS r;
 
@@ -271,7 +273,7 @@ BEGIN
     INTO v_status, v_body
     FROM extensions.http_post(
       v_url,
-      'api_key=' || v_api_key || '&email=' || v_normalized_email,
+      'api_key=' || extensions.urlencode(v_api_key) || '&email=' || extensions.urlencode(v_normalized_email),
       'application/x-www-form-urlencoded'
     ) AS r;
   EXCEPTION WHEN OTHERS THEN
@@ -353,14 +355,17 @@ REVOKE EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) FROM anon
 
 -- Allow authenticated role to call the validator
 GRANT EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) TO authenticated;
--- Also allow anon for pre-auth signup fallback suggestions (consider moving to Edge Function for rate limiting in production)
-GRANT EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) TO anon;
+-- Do not grant anon: the anon key would let anyone spend ZeroBounce credits through
+-- /rest/v1/rpc/validate_email_with_zerobounce. For pre-auth signup checks, use a
+-- rate-limited Edge Function or the BEFORE INSERT trigger on auth.users only.
 
 -- Secure helper functions: revoke from public/anon, only allow internal use
 REVOKE EXECUTE ON FUNCTION public.zb_parse_and_store(TEXT, JSONB) FROM public;
 REVOKE EXECUTE ON FUNCTION public.zb_parse_and_store(TEXT, JSONB) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.zb_parse_and_store(TEXT, JSONB) FROM authenticated;
 REVOKE EXECUTE ON FUNCTION public.zb_should_block_signup(JSONB) FROM public;
 REVOKE EXECUTE ON FUNCTION public.zb_should_block_signup(JSONB) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.zb_should_block_signup(JSONB) FROM authenticated;
 
 -- Secure tables: prevent public/anon access to validation logs and secrets
 REVOKE ALL ON TABLE public.zb_email_validation FROM public;
