@@ -142,20 +142,20 @@ BEGIN
   ORDER BY s.updated_at DESC
   LIMIT 1;
 
-  -- If no API key, return valid and log a skipped entry
+  -- Fail closed when API key is missing (do not treat addresses as valid)
   IF coalesce(api_key, '') = '' THEN
     api_response := jsonb_build_object(
-      'status', 'skipped',
+      'status', 'error',
       'message', 'API key not configured',
       'email', normalized_email
     );
     PERFORM set_config('app.zb_last_validation', api_response::text, true);
     PERFORM public.zb_parse_and_store(normalized_email, api_response);
     RETURN jsonb_build_object(
-      'valid', true,
+      'valid', false,
       'email', normalized_email,
-      'status', 'skipped',
-      'message', 'API key not configured'
+      'status', 'error',
+      'message', 'Email validation is unavailable: API key not configured'
     );
   END IF;
 
@@ -241,14 +241,15 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Require API key; read from app_secrets. If not set, allow signup
+  -- Require API key; read from app_secrets. Fail closed if not configured.
   SELECT s.value INTO v_api_key
   FROM public.app_secrets s
   WHERE s.name = 'ZEROBOUNCE_API_KEY'
   ORDER BY s.updated_at DESC
   LIMIT 1;
   IF v_api_key IS NULL OR v_api_key = '' THEN
-    RETURN NEW;
+    RAISE EXCEPTION SQLSTATE '22023' USING
+      MESSAGE = 'Email validation is unavailable: API key not configured';
   END IF;
 
   -- Normalize and quick-reject obvious invalid formats
@@ -352,12 +353,10 @@ CREATE TRIGGER before_auth_user_insert_validate_email
 -- Revoke all public and anonymous access to prevent API quota abuse on validate_email_with_zerobounce
 REVOKE EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) FROM public;
 REVOKE EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) FROM authenticated;
 
--- Allow authenticated role to call the validator
-GRANT EXECUTE ON FUNCTION public.validate_email_with_zerobounce(text) TO authenticated;
--- Do not grant anon: the anon key would let anyone spend ZeroBounce credits through
--- /rest/v1/rpc/validate_email_with_zerobounce. For pre-auth signup checks, use a
--- rate-limited Edge Function or the BEFORE INSERT trigger on auth.users only.
+-- Do not grant authenticated or anon: RPC would spend ZeroBounce credits from the client.
+-- Use the BEFORE INSERT trigger on auth.users, a service-role Edge Function, or backend only.
 
 -- Secure helper functions: revoke from public/anon, only allow internal use
 REVOKE EXECUTE ON FUNCTION public.zb_parse_and_store(TEXT, JSONB) FROM public;
