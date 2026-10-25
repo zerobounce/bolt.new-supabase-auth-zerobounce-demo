@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AuthError } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
@@ -12,13 +12,64 @@ import { CheckCircle2, Loader2, AlertTriangle, X } from "lucide-react";
 import { authSchema } from "@/schemas/auth.schema";
 import { z } from "zod";
 
+// The server-side Supabase Auth CAPTCHA toggle enforces the check. This flag only
+// controls whether this example renders the widget and supplies its token.
+const captchaEnabled = import.meta.env.VITE_ENABLE_AUTH_CAPTCHA === "true";
+const captchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
+
+type HCaptchaApi = {
+  render: (container: HTMLElement, options: Record<string, unknown>) => number;
+  reset: (widgetId: number) => void;
+};
+
+declare global {
+  interface Window {
+    hcaptcha?: HCaptchaApi;
+    __zbHcaptchaReady?: () => void;
+  }
+}
+
 export const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const captchaWidgetId = useRef<number | null>(null);
   const [validationSuggestion, setValidationSuggestion] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!captchaEnabled || !captchaSiteKey) return;
+    let active = true;
+    const renderCaptcha = () => {
+      if (!active || !window.hcaptcha || !captchaContainerRef.current || captchaWidgetId.current !== null) return;
+      captchaWidgetId.current = window.hcaptcha.render(captchaContainerRef.current, {
+        sitekey: captchaSiteKey,
+        callback: (token: string) => setCaptchaToken(token),
+        "expired-callback": () => setCaptchaToken(null),
+        "error-callback": () => setCaptchaToken(null),
+      });
+    };
+    if (window.hcaptcha) {
+      renderCaptcha();
+    } else {
+      window.__zbHcaptchaReady = renderCaptcha;
+      if (!document.querySelector('script[data-zb-hcaptcha]')) {
+        const script = document.createElement("script");
+        script.src = "https://js.hcaptcha.com/1/api.js?onload=__zbHcaptchaReady&render=explicit";
+        script.async = true;
+        script.defer = true;
+        script.dataset.zbHcaptcha = "true";
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      active = false;
+      if (window.__zbHcaptchaReady === renderCaptcha) delete window.__zbHcaptchaReady;
+    };
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -58,6 +109,10 @@ export const Auth = () => {
       // Validate input with zod
       const validated = authSchema.parse({ email, password });
       const normalizedEmail = validated.email;
+      if (captchaEnabled && (!captchaSiteKey || !captchaToken)) {
+        toast.error("Please complete the CAPTCHA challenge.");
+        return;
+      }
 
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
@@ -65,6 +120,7 @@ export const Auth = () => {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            ...(captchaEnabled ? { captchaToken: captchaToken! } : {}),
           },
         });
         if (error) {
@@ -135,6 +191,7 @@ export const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({
           email: normalizedEmail,
           password,
+          ...(captchaEnabled ? { options: { captchaToken: captchaToken! } } : {}),
         });
         if (error) throw error;
       }
@@ -145,6 +202,10 @@ export const Auth = () => {
         toast.error(isSignUp ? "Signup failed. Please try again." : "Sign in failed. Please try again.");
       }
     } finally {
+      if (captchaEnabled) {
+        if (captchaWidgetId.current !== null) window.hcaptcha?.reset(captchaWidgetId.current);
+        setCaptchaToken(null);
+      }
       setLoading(false);
     }
   };
@@ -244,6 +305,7 @@ export const Auth = () => {
                 className="transition-all duration-200 focus:shadow-soft"
               />
             </div>
+            {captchaEnabled && captchaSiteKey && <div ref={captchaContainerRef} /> }
             <Button
               type="submit"
               className="w-full hover:opacity-90 transition-opacity"

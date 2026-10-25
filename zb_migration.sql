@@ -235,6 +235,7 @@ DECLARE
   v_msg TEXT;
   v_did_you_mean TEXT;
   v_normalized_email TEXT;
+  v_fail_closed BOOLEAN := false;
 BEGIN
   -- Only act if NEW.email is present
   IF NEW.email IS NULL OR length(trim(NEW.email)) = 0 THEN
@@ -251,6 +252,12 @@ BEGIN
     RAISE EXCEPTION SQLSTATE '22023' USING
       MESSAGE = 'Email validation is unavailable: API key not configured';
   END IF;
+
+  -- Opt in to denying signup when the validation service is unavailable.
+  SELECT lower(trim(s.value)) IN ('true', '1', 'on') INTO v_fail_closed
+  FROM public.app_secrets s
+  WHERE s.name = 'ZEROBOUNCE_FAIL_CLOSED';
+  v_fail_closed := coalesce(v_fail_closed, false);
 
   -- Normalize and quick-reject obvious invalid formats
   v_normalized_email := lower(trim(NEW.email));
@@ -278,22 +285,45 @@ BEGIN
       'application/x-www-form-urlencoded'
     ) AS r;
   EXCEPTION WHEN OTHERS THEN
-    RETURN NEW; -- network/timeouts/etc: allow signup
+    RAISE LOG 'ZeroBounce signup validation unavailable; sqlstate=%', SQLSTATE;
+    IF v_fail_closed THEN
+      RAISE EXCEPTION SQLSTATE '22023' USING MESSAGE = 'Email validation is temporarily unavailable. Please try again later.';
+    END IF;
+    RETURN NEW;
   END;
+
+  IF v_status IS NULL OR v_status < 200 OR v_status >= 300 OR v_body IS NULL THEN
+    RAISE LOG 'ZeroBounce signup validation failed; http_status=%', v_status;
+    IF v_fail_closed THEN
+      RAISE EXCEPTION SQLSTATE '22023' USING MESSAGE = 'Email validation is temporarily unavailable. Please try again later.';
+    END IF;
+    RETURN NEW;
+  END IF;
 
   -- Process response and enforce validation decisions (no exception handler here)
   IF v_status >= 200 AND v_status < 300 AND v_body IS NOT NULL THEN
     v_json := v_body::jsonb;
 
+    IF coalesce(v_json->>'status', '') NOT IN
+       ('valid', 'invalid', 'catch-all', 'unknown', 'spamtrap', 'abuse', 'do_not_mail') THEN
+      RAISE LOG 'ZeroBounce signup validation returned unexpected status';
+      IF v_fail_closed THEN
+        RAISE EXCEPTION SQLSTATE '22023' USING MESSAGE = 'Email validation is temporarily unavailable. Please try again later.';
+      END IF;
+      RETURN NEW;
+    END IF;
+
     -- Stash JSON for potential downstream use in this session/tx
     PERFORM set_config('app.zb_last_validation', v_body, true);
 
-    -- Log immediately during signup flow so logging does not depend on AFTER trigger
+    -- Store accepted validations. Rejected signups roll back this row; RAISE LOG
+    -- below records rejection events outside the transaction instead.
     PERFORM public.zb_parse_and_store(v_normalized_email, v_json);
 
     -- If there's a typo suggestion, block with a clear message containing the suggestion
     v_did_you_mean := nullif(v_json->>'did_you_mean', '');
     IF v_did_you_mean IS NOT NULL THEN
+      RAISE LOG 'ZeroBounce signup rejected typo';
       RAISE EXCEPTION SQLSTATE '22023' USING
         MESSAGE = 'Email looks like a typo. Did you mean ' || v_did_you_mean || '?',
         DETAIL = 'did_you_mean=' || v_did_you_mean,
@@ -302,6 +332,7 @@ BEGIN
 
     -- Decide to block or allow based on status/sub_status
     IF public.zb_should_block_signup(v_json) THEN
+      RAISE LOG 'ZeroBounce signup rejected status';
       v_msg := 'Email validation failed: status=' || coalesce(v_json->>'status', 'unknown') ||
                CASE WHEN v_json ? 'sub_status' AND (v_json->>'sub_status') <> '' THEN ', sub_status=' || v_json->>'sub_status' ELSE '' END;
       RAISE EXCEPTION SQLSTATE '22023' USING MESSAGE = v_msg;

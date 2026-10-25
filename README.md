@@ -31,6 +31,28 @@ First apply the migration. Then implement a production-ready user signup flow in
 
 This will apply the database migration and wire up the frontend automatically.
 
+### Required production controls
+
+The migration keeps the original fail-open behavior for ZeroBounce transport failures,
+non-2xx responses, and unrecognized statuses. To deny signup in those cases, add a row to
+`public.app_secrets` with `name = ZEROBOUNCE_FAIL_CLOSED` and `value = true`. Set it to
+`false` (or remove the row) to restore the original behavior. Known invalid statuses and
+missing API keys still block signup regardless of this flag. Rejection events are written
+to PostgreSQL logs without raw email addresses; configure log retention and access.
+
+For CAPTCHA, enable protection with hCaptcha in **Supabase Dashboard → Authentication →
+Bot and Abuse Protection** and enter the hCaptcha secret key there. This Supabase Auth
+setting is the server-side enforcement switch. In the app consuming
+`example_auth_form.tsx`, set `VITE_ENABLE_AUTH_CAPTCHA=true` and set
+`VITE_HCAPTCHA_SITE_KEY` to the public site key. The frontend flag only renders the widget
+and sends its token; it cannot enforce CAPTCHA by itself. The example sends tokens for
+both sign-up and sign-in because the Supabase setting protects Auth flows. To turn it off,
+disable protection in Supabase first, then set the frontend flag to `false`.
+
+Configure Supabase Auth signup rate limits separately. Every signup attempt that reaches
+the database trigger can spend a ZeroBounce API credit, whether CAPTCHA is enabled or not.
+Verify that repeated automated attempts are stopped before they reach the trigger.
+
 ---
 
 ### 2. Add Your ZeroBounce API Key (in Bolt.new)
@@ -72,7 +94,7 @@ The magic happens automatically through Supabase triggers and functions set up b
 - When a user signs up, Supabase runs the **`before_auth_user_insert_validate_email`** trigger.
 - This trigger calls **ZeroBounce’s `/validate` API** with your stored key.
 - If the email is undeliverable or looks suspicious, it’s blocked before signup completes.
-- The validation result is stored in the **`zb_email_validation`** table for analytics or debugging.
+- Accepted validation results are stored in the **`zb_email_validation`** table; rejected attempts appear in PostgreSQL logs.
 - The frontend form (`example_auth_form.tsx`) surfaces these results nicely with toast messages and suggestions.
 
 ---
