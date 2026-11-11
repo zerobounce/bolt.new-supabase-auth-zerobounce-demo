@@ -123,3 +123,7 @@ A production-ready signup form component built with:
 
 🎥 See the full tutorial on how to integrate this in **Bolt.new** step by step:
 > *(link video coming soon)*
+
+## License
+
+MIT. See [LICENSE](LICENSE).
