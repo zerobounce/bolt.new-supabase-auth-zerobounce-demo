@@ -20,14 +20,14 @@ GitHub Issues are disabled on this repository. Open a pull request and include:
 * Expected vs actual behavior
 * Relevant code or error messages
 
-Never paste an API key, a real email address, or a raw API response that contains one into an issue.
+Never paste an API key, a real email address, or a raw API response that contains one into a pull request.
 
 ### Submitting Changes
 
 1. **Fork** the repository and create a branch from the default branch.
 2. **Make your changes.** Keep `zb_migration.sql` and `example_auth_form.tsx` in step with each other, and with the Lovable demo, which uses the same migration. Do not weaken the grants, row-level security or fail-closed behaviour in the migration.
 3. **Commit** with a clear message (e.g. `Add X`, `Fix Y`).
-4. **Push** your branch and open a **Pull Request**. Explain what changed and why, and link any related issues.
+4. **Push** your branch and open a **Pull Request**. Explain what changed and why.
 
 Maintainers will review and may request changes. Once approved, your PR can be merged.
 

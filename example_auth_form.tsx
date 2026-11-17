@@ -146,43 +146,8 @@ export const Auth = () => {
             return;
           }
 
-          // Fallback: if GoTrue hides DB error as "unexpected_failure",
-          // ask the validator directly so we can surface a helpful message
-          const errorCode = (error as AuthError).code;
-          const looksGeneric =
-            errorCode === "unexpected_failure" || /Database error saving new user/i.test(message);
-          if (looksGeneric) {
-            try {
-              const { data, error: rpcError } = await supabase.rpc(
-                "validate_email_with_zerobounce",
-                { p_email: normalizedEmail }
-              );
-              if (!rpcError && data) {
-                const result = data as unknown as {
-                  valid: boolean;
-                  email: string;
-                  status?: string;
-                  sub_status?: string;
-                  did_you_mean?: string;
-                  message?: string;
-                };
-
-                if (result.did_you_mean && result.did_you_mean !== normalizedEmail) {
-                  setValidationSuggestion(result.did_you_mean);
-                  setLoading(false);
-                  return;
-                }
-                if (result.valid === false) {
-                  toast.error("We couldn't verify this email. Please check and try again.");
-                  setLoading(false);
-                  return;
-                }
-              }
-            } catch (_) {
-              // Ignore and fall back to default error handling
-            }
-          }
-
+          // The validator is not callable from the browser. EXECUTE is revoked
+          // from anon and authenticated so a signup cannot spend API credits.
           throw error;
         }
         toast.success("Account created! You can now sign in.");

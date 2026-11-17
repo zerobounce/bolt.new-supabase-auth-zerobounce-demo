@@ -22,3 +22,11 @@ There are none to run locally. CI (`.github/workflows/ci.yml`) checks that the m
 - **Keep the security controls.** The migration revokes `EXECUTE` on the validation function and all table access from `anon` and `authenticated`, and enables row-level security with deny-all policies. A change must not loosen any of them.
 - **Fail closed when there is no key.** Without a key, addresses are not treated as valid.
 - **This demo and the Lovable demo share the same `zb_migration.sql`.** Change both together.
+
+## Changelog
+
+There is no `CHANGELOG.md`. This repository is not a published package, so there is no version history to keep.
+
+## Releasing
+
+There is no registry and no version to tag. Readers use the files on `main`. Do not tag or publish unless a maintainer asks.

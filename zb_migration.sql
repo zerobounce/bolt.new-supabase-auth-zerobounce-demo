@@ -36,6 +36,7 @@ CREATE INDEX idx_zb_email_validation_validated_at ON public.zb_email_validation(
 -- HELPER FUNCTIONS
 -- =====================================================
 
+-- zb-guard-start
 -- A real false success flag: boolean false, number 0 (including 0.0), or
 -- "false" / "0" in any case, trimmed. "x", 0.4, 5, and a true flag are not.
 CREATE OR REPLACE FUNCTION public.zb_false_success(p_json JSONB)
@@ -85,6 +86,7 @@ BEGIN
     cp := ascii(substr(p_key, i, 1));
     IF cp <= 31
        OR (cp >= 127 AND cp <= 159)
+       -- 6155–6159 are U+180B–U+180F. 119155 is U+1D173.
        OR cp IN (32, 160, 173, 1536, 2192, 2193, 5760, 6155, 6156, 6157, 6158, 6159, 8203, 8232, 8233, 8238, 8239, 8287, 8294, 12288, 65279, 65529, 119155)
        OR (cp >= 8192 AND cp <= 8202)
     THEN
@@ -201,16 +203,32 @@ BEGIN
   v := replace(v, extensions.urlencode(p_key), '***');
   decoded := v;
   FOR i IN 1..4 LOOP
-    IF position(p_key IN decoded) > 0 THEN
+    IF position(p_key IN decoded) > 0
+       OR position(public.zb_fold(p_key) IN public.zb_fold(decoded)) > 0 THEN
       RETURN 'the response text was omitted because it contained a credential';
     END IF;
     decoded := public.zb_loosen_encoding(decoded);
   END LOOP;
-  IF position(p_key IN decoded) > 0 OR position(upper(p_key) IN upper(decoded)) > 0 THEN
+  IF position(p_key IN decoded) > 0
+     OR position(public.zb_fold(p_key) IN public.zb_fold(decoded)) > 0 THEN
     RETURN 'the response text was omitted because it contained a credential';
   END IF;
   RETURN v;
 END;
+$$;
+
+-- Case fold for a stored field: NFD, lower case, ß/ẞ to ss, drop a combining dot.
+CREATE OR REPLACE FUNCTION public.zb_fold(p_text text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = ''
+AS $$
+  SELECT replace(
+           replace(
+             replace(lower(normalize(p_text, nfd)), chr(223), 'ss'),
+             chr(7838), 'ss'),
+           chr(775), '');
 $$;
 
 -- Fields the log may keep. Message and error strings are not copied: they are where a body echoes the key.
@@ -329,6 +347,7 @@ BEGIN
   RETURN lower(coalesce(v_status, '')) = ANY (v_block_statuses);
 END;
 $$;
+-- zb-guard-end
 
 -- Email validator using ZeroBounce (vault-backed, safe search_path)
 CREATE OR REPLACE FUNCTION public.validate_email_with_zerobounce(p_email text)
@@ -642,11 +661,13 @@ REVOKE EXECUTE ON FUNCTION public.zb_false_success(JSONB) FROM public, anon, aut
 REVOKE EXECUTE ON FUNCTION public.zb_api_key_rejected(text) FROM public, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.zb_loosen_encoding(text) FROM public, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.zb_redact_text(text, text) FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.zb_fold(text) FROM public, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.zb_stored_response(JSONB, text) FROM public, anon, authenticated;
 
 -- Secure tables: prevent public/anon access to validation logs and secrets
 REVOKE ALL ON TABLE public.zb_email_validation FROM public;
 REVOKE ALL ON TABLE public.zb_email_validation FROM anon;
+REVOKE ALL ON TABLE public.zb_email_validation FROM authenticated;
 REVOKE ALL ON TABLE public.app_secrets FROM public;
 REVOKE ALL ON TABLE public.app_secrets FROM anon;
 REVOKE ALL ON TABLE public.app_secrets FROM authenticated;
