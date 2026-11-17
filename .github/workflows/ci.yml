@@ -23,4 +23,7 @@ jobs:
         run: |
           test -f zb_migration.sql
           grep -q 'validate_email_with_zerobounce' zb_migration.sql
+          grep -q 'zb_should_block_signup' zb_migration.sql
+          grep -q 'zb_false_success' zb_migration.sql
+          grep -q "set_config('http.timeout_msec'" zb_migration.sql
           grep -q "valid', false" zb_migration.sql

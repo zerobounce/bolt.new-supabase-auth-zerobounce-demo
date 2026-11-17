@@ -14,7 +14,7 @@ A demo that adds real-time ZeroBounce email validation to Supabase Auth sign-up 
 
 ## Commands
 
-There are none to run locally. CI (`.github/workflows/ci.yml`) checks that the migration still defines the validation function and still fails closed.
+There are none to run locally. CI (`.github/workflows/ci.yml`) checks that the migration still defines the validation function, the signup block, and the false-success guard. It does not run the database. Sign-up still fails open on a transport error unless `ZEROBOUNCE_FAIL_CLOSED` is set.
 
 ## Conventions
 

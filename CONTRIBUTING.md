@@ -8,13 +8,13 @@ By participating in this project, you agree to uphold our [Code of Conduct](CODE
 
 ## Getting Started
 
-See the [README](README.md) for how the two files are used in Bolt.new with Supabase Auth. There is nothing to build or install; CI checks that the migration still contains the validation function and fails closed.
+See the [README](README.md) for how the two files are used in Bolt.new with Supabase Auth. There is nothing to build or install. CI checks that the migration still contains the validation function, the signup block, and the false-success guard. It does not run the database.
 
 ## How to Contribute
 
 ### Reporting Bugs
 
-Open an [issue](https://github.com/zerobounce/bolt.new-supabase-auth-zerobounce-demo/issues) and include:
+GitHub Issues are disabled on this repository. Open a pull request and include:
 
 * What you did, step by step
 * Expected vs actual behavior

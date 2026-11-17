@@ -11,13 +11,13 @@ Import our demo into your bolt.new account by clicking  <a href="https://bolt.ne
 
 ### 1. Upload the Two Files
 
-Add this 2 files to the chat:
+Add these two files to the chat:
 
 - [zb_migration.sql](https://github.com/zerobounce/bolt.new-supabase-auth-zerobounce-demo/blob/main/zb_migration.sql)
 - [example_auth_form.tsx](https://github.com/zerobounce/bolt.new-supabase-auth-zerobounce-demo/blob/main/example_auth_form.tsx)
 
 
-Use this setup prompt after files where uploaded:
+Use this setup prompt after the files were uploaded:
 
 ```
 You are my senior engineer programmer. I’m attaching two files:
@@ -57,7 +57,7 @@ Verify that repeated automated attempts are stopped before they reach the trigge
 
 ### 2. Add Your ZeroBounce API Key (in Bolt.new)
 
-This integration uses your **Supabase database** under the hood — so make sure **Cloud Mode is enabled** in Lovable.
+This integration uses your **Supabase database**, so the Bolt.new project must be connected to Supabase.
 
 Then:
 
@@ -92,7 +92,7 @@ The magic happens automatically through Supabase triggers and functions set up b
 ## 🧠 How It Works (Behind the Scenes)
 
 - When a user signs up, Supabase runs the **`before_auth_user_insert_validate_email`** trigger.
-- This trigger calls **ZeroBounce’s `/validate` API** with your stored key.
+- This trigger calls **ZeroBounce’s `/v2/validate` API** with your stored key.
 - If the email is undeliverable or looks suspicious, it’s blocked before signup completes.
 - Accepted validation results are stored in the **`zb_email_validation`** table; rejected attempts appear in PostgreSQL logs.
 - The frontend form (`example_auth_form.tsx`) surfaces these results nicely with toast messages and suggestions.

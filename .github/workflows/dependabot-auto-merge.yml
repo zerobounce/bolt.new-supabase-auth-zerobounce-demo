@@ -104,7 +104,15 @@ jobs:
         if: steps.policy.outputs.eligible == 'false'
         env:
           REASON: ${{ steps.policy.outputs.reason }}
-        run: >-
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          already=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+            --jq '[.[] | select(.user.login | startswith("github-actions")) | select(.body | startswith("Not auto-merged:"))] | length')
+          if [ "$already" != "0" ]; then
+            echo "Already commented."
+            exit 0
+          fi
           gh pr comment "$PR_URL" --body "Not auto-merged: $REASON.
           Review the changelog and merge by hand."
 
